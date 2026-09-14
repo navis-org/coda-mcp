@@ -1,0 +1,35 @@
+{
+  "name": "@navis-org/coda-mcp",
+  "version": "0.1.0",
+  "description": "An MCP server for building Coda workflows with your own LLM",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "coda-mcp": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@10.11.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/navis-org/coda-mcp.git"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "pnpm build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.2",
+    "typescript": "~5.8.3",
+    "vitest": "^3.2.7"
+  }
+}
