@@ -64,6 +64,8 @@ server {
         proxy_buffering off;          # SSE
         proxy_read_timeout 1h;
         proxy_buffer_size 32k;        # > CODA_MCP_REDIRECT_MAX_CHARS, else 502 on long redirects
+        proxy_buffers 8 32k;          # required with the above: nginx -t checks busy < buffers - 1
+        proxy_busy_buffers_size 64k;
         limit_req zone=coda_mcp burst=40 nodelay;
     }
 }

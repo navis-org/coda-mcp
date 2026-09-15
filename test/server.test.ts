@@ -7,7 +7,6 @@ import { loadArtifact } from '../src/artifact.js'
 import type { LoadedArtifact } from '../src/artifact.js'
 import { installFetch } from '../src/network.js'
 import { createCodaServer } from '../src/server.js'
-import { REREAD } from '../src/tools.js'
 import { buildLocation as location, idOf, tempDir, tempLinkStore } from './support.js'
 
 const DATASET_AND_SEARCH = {
@@ -135,11 +134,6 @@ describe.skipIf(!location)('coda-mcp over MCP', () => {
 
     const full = textOf(await client.callTool({ name: 'coda_get_link', arguments: { full_link: true } }))
     expect(full.startsWith(`${artifact.siteUrl}#!c1.`)).toBe(true)
-  })
-
-  it("still finds, in Coda's rules, every phrase the guide's preface re-reads", () => {
-    const rules = artifact.coda.guide()
-    for (const phrase of Object.values(REREAD)) expect(rules).toContain(phrase)
   })
 
   it("serves a node's details, and suggests near names for a mistyped one", async () => {

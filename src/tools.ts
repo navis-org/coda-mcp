@@ -21,17 +21,6 @@ export interface Tool {
 /** Above this many nodes a successful plan reports counts, and the listing is a separate call. */
 const INLINE_LISTING_MAX_NODES = 25
 
-/**
- * Phrases in Coda's rules that the guide's preface re-reads for this server. `server.test.ts` holds
- * them against the build, which CI runs daily against the deployed one: a reworded rule would
- * otherwise leave the preface pointing at text that no longer exists, with nothing failing.
- */
-export const REREAD = {
-  listing: 'the current-graph listing',
-  answer: 'Answer with a plan and nothing else',
-  empty: 'return an empty plan',
-} as const
-
 function reply(text: string, isError = false): CallToolResult {
   return { content: [{ type: 'text', text }], isError }
 }
@@ -213,16 +202,15 @@ export function buildTools(session: Session, links?: LinkStore): Tool[] {
   ]
 }
 
+/**
+ * The one fact about this server the guide cannot know. Coda frames the guide itself for a model
+ * working through tools; this server once re-read Coda's in-app wording in a preface, which a model
+ * rightly flagged as a tool result rewriting instructions.
+ */
 function guidePreface(session: Session): string {
-  return [
-    "The guide below was written for Coda's in-app assistant. Read it with three substitutions:",
-    `- "${REREAD.listing}" is what coda_describe_draft returns, and what coda_apply_plan returns for a small draft;`,
-    `- "${REREAD.answer}" means: submit plans through coda_apply_plan, several small ones rather than one large one, and talk to the user as usual;`,
-    `- where it says to "${REREAD.empty}" because nothing can be built, tell the user so instead of calling a tool.`,
-    session.fetches
-      ? 'Network access is on: dataset nodes can learn their real columns, which may take a moment after an edit.'
-      : "Network access is off: nodes on a real dataset cannot learn that dataset's columns, so their `carries:` lines may be missing. Treat a missing line as unknown, as the guide says. The synthetic dataset (dataset.mock.opticlobe) is fully checkable.",
-  ].join('\n')
+  return session.fetches
+    ? 'Network access is on: dataset nodes can learn their real columns, which may take a moment after an edit.'
+    : "Network access is off: nodes on a real dataset cannot learn that dataset's columns, so their `carries:` lines may be missing. Treat a missing line as unknown, as the guide says. The synthetic dataset (dataset.mock.opticlobe) is fully checkable."
 }
 
 function warningLine(warning: ApplyWarning): string {
