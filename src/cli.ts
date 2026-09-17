@@ -11,7 +11,7 @@ import { loadArtifact } from './artifact.js'
 import type { ArtifactOptions, LoadedArtifact } from './artifact.js'
 import { errorMessage } from './errors.js'
 import { isLoopback, serveHttp } from './http.js'
-import { DEFAULT_REDIRECT_MAX_CHARS, LinkStore, linkRoutes } from './links.js'
+import { DEFAULT_REDIRECT_MAX_CHARS, DEFAULT_REFERRER_MARK, LinkStore, linkRoutes } from './links.js'
 import { installFetch, policyFromEnv } from './network.js'
 import { FreshArtifact } from './refresh.js'
 import { createCodaServer } from './server.js'
@@ -28,6 +28,8 @@ Environment:
   CODA_MCP_LINK_DIR                 where short links are stored (default: ~/.local/share/coda-mcp/links)
   CODA_MCP_LINK_TTL_DAYS            remove a short link unopened for this many days (default: 0, keep)
   CODA_MCP_REDIRECT_MAX_CHARS       longest packed link a short link redirects to (default: ${DEFAULT_REDIRECT_MAX_CHARS})
+  CODA_MCP_REFERRER_MARK            ?ref= a short link's redirect carries, so opens through this
+                                    server are countable (default: ${DEFAULT_REFERRER_MARK}; empty = none)
   CODA_MCP_ALLOWED_HOSTS            comma-separated Host headers to accept besides loopback
                                     (default: the public URL's host)
   CODA_MCP_REFRESH_MINUTES          how often to check for a newer Coda build (default: ${DEFAULT_REFRESH_MINUTES}; 0 = never)
@@ -112,6 +114,8 @@ async function main(): Promise<void> {
         publicUrl,
         ttlDays: numberFromEnv('CODA_MCP_LINK_TTL_DAYS', 0),
         redirectMaxChars: numberFromEnv('CODA_MCP_REDIRECT_MAX_CHARS', DEFAULT_REDIRECT_MAX_CHARS),
+        // `??`, not `||`: an empty setting is how an operator turns the marker off.
+        referrerMark: process.env.CODA_MCP_REFERRER_MARK?.trim() ?? DEFAULT_REFERRER_MARK,
       })
     : undefined
   if (links) {

@@ -14,7 +14,7 @@ import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { CodaContract, CodaGraph } from '../src/contract.js'
 import { serveHttp } from '../src/http.js'
-import { LinkStore, linkRoutes } from '../src/links.js'
+import { LinkStore, linkRoutes, markReferrer } from '../src/links.js'
 import { idOf, tempLinkStore } from './support.js'
 
 const SITE = 'https://coda.example/'
@@ -46,7 +46,7 @@ describe('LinkStore', () => {
     const longAgo = new Date(Date.now() - 31 * 86_400_000)
     await utimes(join(links.dir, `${old}.json`), longAgo, longAgo)
 
-    const forever = new LinkStore({ dir: links.dir, publicUrl: PUBLIC, ttlDays: 0, redirectMaxChars: 1 })
+    const forever = new LinkStore({ dir: links.dir, publicUrl: PUBLIC, ttlDays: 0, redirectMaxChars: 1, referrerMark: '' })
     expect(await forever.sweep()).toBe(0)
     expect(await links.sweep()).toBe(1)
     expect(await links.read(old)).toBeUndefined()
@@ -82,7 +82,9 @@ describe('short links over HTTP', () => {
     const id = idOf(await links.save(graph('r'), '{"nodes":[]}'))
     const redirect = await get(`/w/${id}`)
     expect(redirect.status).toBe(302)
-    expect(redirect.headers.get('location')).toBe(packed)
+    // Marked, and before the fragment: a 302 names no referrer of its own, and the fragment is the
+    // workflow. `?ref=` is what puts an open through this server in the site's referrer list.
+    expect(redirect.headers.get('location')).toBe(`${SITE}?ref=coda-mcp#!c1.short`)
 
     const json = await get(`/w/${id}.json`)
     expect(json.status).toBe(200)
@@ -94,7 +96,15 @@ describe('short links over HTTP', () => {
     const id = idOf(await links.save(graph('long'), '{}'))
     packed = `${SITE}#!c1.${'x'.repeat(200)}`
     const redirect = await get(`/w/${id}`)
-    expect(redirect.headers.get('location')).toBe(`${SITE}#!${PUBLIC}/w/${id}.json`)
+    expect(redirect.headers.get('location')).toBe(`${SITE}?ref=coda-mcp#!${PUBLIC}/w/${id}.json`)
+  })
+
+  it('marks a redirect before the fragment, keeps any query the site URL has, and obeys an empty mark', () => {
+    expect(markReferrer('https://coda.example/#!c1.x', 'coda-mcp')).toBe('https://coda.example/?ref=coda-mcp#!c1.x')
+    expect(markReferrer('https://coda.example/?a=1#!c1.x', 'coda-mcp')).toBe(
+      'https://coda.example/?a=1&ref=coda-mcp#!c1.x',
+    )
+    expect(markReferrer('https://coda.example/#!c1.x', '')).toBe('https://coda.example/#!c1.x')
   })
 
   it('answers 404 for an unknown link or path, and 405 for a write', async () => {

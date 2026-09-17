@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs'
 import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { DEFAULT_REDIRECT_MAX_CHARS, LinkStore } from '../src/links.js'
+import { DEFAULT_REDIRECT_MAX_CHARS, DEFAULT_REFERRER_MARK, LinkStore } from '../src/links.js'
 import type { LinkStoreOptions } from '../src/links.js'
 
 const SIBLING = resolve(import.meta.dirname, '../../coda/dist/mcp/v1/coda.js')
@@ -28,6 +28,7 @@ export async function tempLinkStore(options: Partial<LinkStoreOptions> = {}): Pr
     publicUrl: 'https://mcp.example',
     ttlDays: 0,
     redirectMaxChars: DEFAULT_REDIRECT_MAX_CHARS,
+    referrerMark: DEFAULT_REFERRER_MARK,
     ...options,
   })
 }

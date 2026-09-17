@@ -28,7 +28,7 @@ Add a remote MCP server (custom connector) with URL `https://<host>/mcp`.
 | Path | |
 | ---- | - |
 | `/mcp` | Streamable HTTP; one session = one server + one in-memory draft; idle sessions closed after 1 h |
-| `GET /w/<id>` | `302` → `<site>#!c1.<packed>`; above `CODA_MCP_REDIRECT_MAX_CHARS` → `<site>#!https://<host>/w/<id>.json` (Coda prompts before fetching) |
+| `GET /w/<id>` | `302` → `<site>?ref=<CODA_MCP_REFERRER_MARK>#!c1.<packed>`; above `CODA_MCP_REDIRECT_MAX_CHARS` → `<site>?ref=…#!https://<host>/w/<id>.json` (Coda prompts before fetching) |
 | `GET /w/<id>.json` | stored `.coda.json`, `Access-Control-Allow-Origin: *` |
 
 ## Design
@@ -42,6 +42,12 @@ Add a remote MCP server (custom connector) with URL `https://<host>/mcp`.
 - **Short links.** id = first 22 chars of base64url SHA-256 over the draft; one file per link in
   `CODA_MCP_LINK_DIR`; retention by mtime, touched on open. Drafts are stored server-side; `full_link`
   stores nothing.
+- **A redirect names itself.** A browser carries the referrer of the original navigation through a
+  302, so this host never appears in the site's analytics on its own — an open from a chat client has
+  no referrer at all. The redirect target therefore carries `?ref=` (`CODA_MCP_REFERRER_MARK`, empty
+  to disable), which is the parameter GoatCounter and the `utm_source` convention read in place of
+  the HTTP referrer. It is inert to Coda, which reads only the fragment, and it is on the redirect
+  only: `full_link` stores nothing and is marked with nothing.
 
 ## Run
 
@@ -79,6 +85,7 @@ server {
 | `CODA_MCP_LINK_DIR` | `~/.local/share/coda-mcp/links` | short-link storage |
 | `CODA_MCP_LINK_TTL_DAYS` | `0` | delete links unopened for N days; `0` keeps |
 | `CODA_MCP_REDIRECT_MAX_CHARS` | `16000` | longest packed link served as a redirect |
+| `CODA_MCP_REFERRER_MARK` | `coda-mcp` | `?ref=` on a redirect, so opens through this server are countable; empty = none |
 | `CODA_MCP_ALLOWED_HOSTS` | public URL host | extra accepted `Host` headers (loopback always accepted) |
 | `CODA_MCP_REFRESH_MINUTES` | `10` | build re-check interval; `0` disables |
 | `CODA_ARTIFACT` | `https://coda.science/mcp/v1/coda.js` | Coda build: URL or path |

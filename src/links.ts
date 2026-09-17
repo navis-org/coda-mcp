@@ -5,6 +5,8 @@
  *   is one entry, and an id cannot be guessed without the workflow.
  * - `/w/<id>` redirects to the packed `#!c1.` link, or, past `redirectMaxChars`, to Coda's
  *   `#!https://` form naming `/w/<id>.json`, which Coda fetches after asking the recipient.
+ * - Both redirect targets carry `?ref=<referrerMark>`, which is the only thing that can say an open
+ *   came from here; see `markReferrer`.
  * - Links are kept forever unless `ttlDays` is set, and opening one counts as use.
  *
  * Why each of those, and what the threshold protects against, is recorded under "Short links" in
@@ -26,6 +28,9 @@ const SWEEP_EVERY_MS = 3_600_000
 /** Kept under the proxy's response-header buffer, which the README's nginx block sets to 32k. */
 export const DEFAULT_REDIRECT_MAX_CHARS = 16_000
 
+/** What a redirect names itself as in the site's analytics. Empty turns the marker off. */
+export const DEFAULT_REFERRER_MARK = 'coda-mcp'
+
 export interface LinkStoreOptions {
   /** Defaults to `~/.local/share/coda-mcp/links`. */
   dir?: string
@@ -34,6 +39,8 @@ export interface LinkStoreOptions {
   /** Remove a link not opened for this many days. Zero keeps links forever. */
   ttlDays: number
   redirectMaxChars: number
+  /** The `?ref=` a redirect carries; empty sends the target no marker at all. */
+  referrerMark: string
 }
 
 export class LinkStore {
@@ -41,12 +48,14 @@ export class LinkStore {
   readonly publicUrl: string
   readonly ttlDays: number
   readonly redirectMaxChars: number
+  readonly referrerMark: string
 
   constructor(options: LinkStoreOptions) {
     this.dir = options.dir ?? join(appDir('data'), 'links')
     this.publicUrl = new URL(options.publicUrl).href.replace(/\/+$/, '')
     this.ttlDays = options.ttlDays
     this.redirectMaxChars = options.redirectMaxChars
+    this.referrerMark = options.referrerMark
   }
 
   /** Store a draft as its `.coda.json`, returning its short link. The same draft is the same link. */
@@ -124,6 +133,30 @@ async function touch(file: string): Promise<void> {
 }
 
 /**
+ * `https://coda.science/?ref=coda-mcp#!c1.…` — where an open through this server says so.
+ *
+ * **A 302 does not name the host that sent it.** A browser carries the referrer of the *original*
+ * navigation through a redirect, so `/w/<id>` never reaches the site's analytics: an open from a
+ * chat client arrives with no referrer at all, one from a browser tab arrives as that tab's origin,
+ * and both read exactly like a pasted link. The query parameter is the only channel left, and it is
+ * the documented one — GoatCounter reads `ref`, `src`, `source` or `utm_source` and falls back to
+ * the HTTP referrer, which is the convention every other analytics follows too.
+ *
+ * It goes **before the fragment**, which is where the workflow is: the fragment never leaves the
+ * browser, and a marker appended after it would be part of the packed graph rather than a query.
+ * Nothing in Coda reads `location.search`, so this is inert to the app that receives it — and it is
+ * the redirect only: `full_link` reaches no server and carries no marker, which leaves that escape
+ * hatch exactly as it was for anybody who wants no trace of their workflow anywhere.
+ */
+export function markReferrer(url: string, mark: string): string {
+  if (!mark) return url
+  const cut = url.indexOf('#')
+  const head = cut === -1 ? url : url.slice(0, cut)
+  const fragment = cut === -1 ? '' : url.slice(cut)
+  return `${head}${head.includes('?') ? '&' : '?'}ref=${encodeURIComponent(mark)}${fragment}`
+}
+
+/**
  * `GET /w/<id>` and `GET /w/<id>.json`, and `HEAD` for both. Answers false for any other path.
  *
  * `current` is read per request, so a redirect is packed by the Coda build this server holds now.
@@ -150,9 +183,13 @@ export function linkRoutes(store: LinkStore, current: () => { coda: CodaContract
       return true
     }
     const { coda, siteUrl } = current()
-    const packed = await coda.shareLink(JSON.parse(json) as CodaGraph, siteUrl)
+    const mark = store.referrerMark
+    const packed = markReferrer(await coda.shareLink(JSON.parse(json) as CodaGraph, siteUrl), mark)
+    // Measured after marking: what the proxy's header buffer has to hold is the header sent.
     const location =
-      packed.length <= store.redirectMaxChars ? packed : `${siteUrl}#!${store.publicUrl}/w/${id}.json`
+      packed.length <= store.redirectMaxChars
+        ? packed
+        : markReferrer(`${siteUrl}#!${store.publicUrl}/w/${id}.json`, mark)
     res.writeHead(302, { location, 'cache-control': 'no-cache' }).end()
     return true
   }
