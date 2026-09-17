@@ -1,0 +1,26 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.navis-org/coda",
+  "title": "Coda — connectome data analysis",
+  "description": "Builds connectome analysis workflows (neuPrint, CAVE, CATMAID) and returns a link to open them.",
+  "version": "0.1.0",
+  "websiteUrl": "https://coda.science/mcp.html",
+  "repository": {
+    "url": "https://github.com/navis-org/coda-mcp",
+    "source": "github",
+    "id": "1368590244"
+  },
+  "icons": [
+    {
+      "src": "https://coda.science/icon-192.png",
+      "mimeType": "image/png",
+      "sizes": ["192x192"]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://flyem.mrc-lmb.cam.ac.uk/coda-mcp/mcp"
+    }
+  ]
+}

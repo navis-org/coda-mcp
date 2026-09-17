@@ -1,0 +1,70 @@
+# Publish this server's entry to the official MCP Registry.
+#
+# What this does and does not do:
+#
+#   - It publishes **metadata** — the name, the description and the URL of the running
+#     deployment. The registry hosts no artifact for a remote server, so nothing here ships
+#     code and nothing here deploys anything. The instance at `remotes[0].url` is deployed by
+#     hand (coda's `docs/deployment.md`); this only tells the world where it is.
+#   - A published version is **immutable, and its version string may never repeat**. So a
+#     changed URL, title or description is a new tag, not an edit — which is why the version
+#     lives in files under review rather than being computed here.
+#
+# Authentication is GitHub OIDC: no secret, no token to rotate, and the namespace comes from
+# this repository's owner, so it can only ever write under `io.github.navis-org/*`. It requires
+# the publisher to be an **Owner** of the organisation. If the registry ever refuses the org
+# namespace, the fallback is `login github --token` with a classic PAT carrying `read:org`
+# (nothing else — the registry never reads code), stored as an *environment* secret.
+name: Publish to MCP Registry
+
+on:
+  push:
+    tags: ['v*']
+  # For a re-publish that is not a code change — a moved endpoint, reworded description. It
+  # still needs a version nobody has used: bump `server.json` and `package.json` first.
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # OIDC
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # One version, in files, checked rather than written. The alternative — `jq` writing the
+      # tag into `server.json` in the runner — publishes a file that never existed in the
+      # repository, so what the registry serves could not be reviewed in a diff.
+      - name: Versions agree
+        run: |
+          pkg=$(jq -r .version package.json)
+          srv=$(jq -r .version server.json)
+          if [ "$pkg" != "$srv" ]; then
+            echo "::error::package.json is $pkg and server.json is $srv — they must match."
+            exit 1
+          fi
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            tag=${GITHUB_REF_NAME#v}
+            if [ "$tag" != "$srv" ]; then
+              echo "::error::tag ${GITHUB_REF_NAME} does not name version $srv."
+              exit 1
+            fi
+          fi
+          echo "publishing $srv"
+
+      - name: Install mcp-publisher
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      # Before authenticating, so a malformed file fails on its own terms rather than as a
+      # publish error.
+      - name: Validate server.json
+        run: ./mcp-publisher validate server.json
+
+      - name: Authenticate
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish
+        run: ./mcp-publisher publish

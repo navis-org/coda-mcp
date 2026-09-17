@@ -4,11 +4,11 @@ Remote MCP server for authoring [Coda](https://coda.science) workflows. Tools ed
 check it against Coda's node definitions, and return a link that opens it in Coda. Nothing is
 executed server-side.
 
-Pre-release: requires a Coda deploy that publishes `mcp/v1/coda.js`.
-
 ## Connect
 
-Add a remote MCP server (custom connector) with URL `https://<host>/mcp`.
+Add a remote MCP server (custom connector) with URL `https://<host>/mcp`. The instance behind
+[coda.science/mcp.html](https://coda.science/mcp.html) is
+`https://flyem.mrc-lmb.cam.ac.uk/coda-mcp/mcp`.
 
 ## Tools
 
@@ -94,6 +94,43 @@ server {
 | `CODA_MCP_NETWORK` | off | allow dataset requests |
 | `NEUPRINT_APPLICATION_CREDENTIALS` | — | neuPrint token (network mode) |
 | `CODA_CAVE_TOKENS` | — | JSON `{ "<cave server>": "<token>" }` (network mode) |
+
+## The registry entry
+
+`server.json` is this server's entry in the [official MCP Registry](https://registry.modelcontextprotocol.io),
+published as `io.github.navis-org/coda`. It is metadata only — the registry hosts no artifact for
+a remote server, so an entry says *where the running deployment is*, and publishing one deploys
+nothing.
+
+Three rules follow from the registry's own, and each is a way to get it wrong:
+
+- **A version is published once and is then immutable.** Changing the URL, the title or the
+  description means a **new version**, not an edit. So `server.json`'s `version`,
+  `package.json`'s `version` and the release tag are one number, and
+  `.github/workflows/publish-mcp.yml` refuses to publish unless all three agree.
+- **The namespace is the organisation's**, which GitHub authentication grants only to an
+  organisation **Owner**. The workflow uses OIDC, so the namespace comes from this repository's
+  owner and there is no token to store or rotate.
+- **There is no `packages` entry**, deliberately. This server is hosted; the npm package is not
+  published, and a `packages` entry naming a package that is not there fails the registry's
+  ownership check. If it is ever published to npm, that entry needs `"mcpName":
+  "io.github.navis-org/coda"` in `package.json` to pass it.
+
+To publish, tag a release — `git tag v0.1.1 && git push origin v0.1.1` — or run the workflow by
+hand after bumping both versions. By hand, from a machine:
+
+```bash
+brew install mcp-publisher     # or the release tarball
+mcp-publisher validate server.json
+mcp-publisher login github     # device flow; must be an Owner of navis-org
+mcp-publisher publish
+```
+
+Check what the registry holds:
+
+```bash
+curl "https://registry.modelcontextprotocol.io/v0/servers?search=io.github.navis-org/coda"
+```
 
 ## Development
 
